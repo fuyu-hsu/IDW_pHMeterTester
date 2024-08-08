@@ -51,49 +51,51 @@ void setup() {
     delay(100);
     Serial.println("等待时间同步..."); // 等待时间同步完成
   }
-}
-
-void loop() {
-  // 获取当前时间
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo)) {
     Serial.println("获取本地时间失败");
     return;
   }
+  Serial.printf("%d-%d-%d %d:%d:%d",
+    timeinfo.tm_year,timeinfo.tm_mon,timeinfo.tm_mday,
+    timeinfo.tm_hour,timeinfo.tm_min,timeinfo.tm_sec
+  );
+  setTime(timeinfo.tm_hour,timeinfo.tm_min,timeinfo.tm_sec,
+    timeinfo.tm_mday,timeinfo.tm_mon+1,timeinfo.tm_year+1900
+  );
+}
 
-  // 格式化时间为指定格式
-  char formattedTime[50];
-  strftime(formattedTime, sizeof(formattedTime), "%Y-%m-%dT%H:%M:%S", &timeinfo);
-
-
+void loop() {
   for (int ph_index = 0; ph_index < 5; ph_index++) {
     uint16_t v_buffer[NUM_READINGS];
     for(int i = 0; i < NUM_READINGS; i++){
-      v_buffer[i] = (uint16_t)readPH(pH_meterSettingList[ph_index]);
+      v_buffer[i] = analogRead(pH_meterSettingList[ph_index].pin);
+      // Serial.println(v_buffer[i]);
       delay(100);
     }
-    pH_meterSettingList[ph_index].result = afterFilterValue(v_buffer,NUM_READINGS);
+    pH_meterSettingList[ph_index].result = pH_meterSettingList[ph_index].a * afterFilterValue(v_buffer,NUM_READINGS)*3.3/4096 + pH_meterSettingList[ph_index].b;
     String DataTime = GetDatetimeString("-","T",":");
-    Serial.printf("%s, %s, %.2f\n", 
+    Serial.printf("%s, %s, %.2f, %.2f\n", 
       pH_meterSettingList[ph_index].name.c_str(),
       DataTime.c_str(),
-      pH_meterSettingList[ph_index].result
+      pH_meterSettingList[ph_index].result,
+      afterFilterValue(v_buffer,NUM_READINGS)*3.3/4096
     );
     HTTPClient http1;
     String url1 = String(serverAddress) + String(endpoint) + 
                   "?name=" + pH_meterSettingList[ph_index].name + 
                   "&time=" + DataTime + 
                   "&value=" + String(pH_meterSettingList[ph_index].result, 2);
-    http1.begin(url1); // 开始第一个HTTP连接
-    int httpResponseCode1 = http1.GET(); // 发送第一个GET请求
-    if (httpResponseCode1 > 0) {
-      Serial.print("HTTP Response code 1: ");
-      Serial.println(httpResponseCode1);
-    } else {
-      Serial.print("HTTP GET request failed 1, error: ");
-      Serial.println(http1.errorToString(httpResponseCode1).c_str());
-    }
-    http1.end(); // 关闭第一个HTTP连接
+    // http1.begin(url1); // 开始第一个HTTP连接
+    // int httpResponseCode1 = http1.GET(); // 发送第一个GET请求
+    // if (httpResponseCode1 > 0) {
+    //   Serial.print("HTTP Response code 1: ");
+    //   Serial.println(httpResponseCode1);
+    // } else {
+    //   Serial.print("HTTP GET request failed 1, error: ");
+    //   Serial.println(http1.errorToString(httpResponseCode1).c_str());
+    // }
+    // http1.end(); // 关闭第一个HTTP连接
   }
   // delay(10000);  // 延时10秒
 }
