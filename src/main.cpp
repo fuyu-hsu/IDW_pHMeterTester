@@ -6,12 +6,20 @@
 #include "CalcFunction.h"
 #include "TimeLibExternalFunction.h"
 
+/**
+ * 0dB --- 1.1 V
+ * 2.5dB --- 1.5V
+ * 6dB --- 2.2V
+ * 11db --- 3.3V
+ */
+
 typedef struct {
   int pin;
   String name;
   double a;
   double b;
   double result;
+  adc_attenuation_t adc_attenuatio;
 } ph_meter_setting_t;
 
 ph_meter_setting_t pH_meterSettingList[5]; 
@@ -41,12 +49,12 @@ void setup() {
   SPI.begin(); // 初始化 SPI 介面
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);  // 启动 WiFi 连接
 
-  pH_meterSettingList[0] = {33, "pH0001", 9.9852, 3.7507};
-  pH_meterSettingList[1] = {34, "pH0002", 15.659, 9.5989};
-  pH_meterSettingList[2] = {34, "pH0003", 5.2545, 1.4127};
-  pH_meterSettingList[3] = {32, "pH0004", 3.5039, 3.8348};
-  pH_meterSettingList[4] = {39, "pH0005", -42.568, 11.541};
-
+  pH_meterSettingList[0] = {33, "pH0001", 9.9852, 3.7507, ADC_6db};
+  pH_meterSettingList[1] = {34, "pH0002", 15.659, 9.5989, ADC_6db};
+  pH_meterSettingList[2] = {34, "pH0003", 5.2545, 1.4127, ADC_6db};
+  pH_meterSettingList[3] = {32, "pH0004", 3.5039, 3.8348, ADC_6db};
+  pH_meterSettingList[4] = {39, "pH0005", -42.568, 11.541, ADC_0db};
+  
   while (!time(nullptr)) {
     delay(100);
     Serial.println("等待时间同步..."); // 等待时间同步完成
@@ -67,19 +75,37 @@ void setup() {
 
 void loop() {
   for (int ph_index = 0; ph_index < 5; ph_index++) {
+    pinMode(pH_meterSettingList[ph_index].pin, INPUT);
+    analogSetPinAttenuation(pH_meterSettingList[ph_index].pin, pH_meterSettingList[ph_index].adc_attenuatio);
     uint16_t v_buffer[NUM_READINGS];
     for(int i = 0; i < NUM_READINGS; i++){
       v_buffer[i] = analogRead(pH_meterSettingList[ph_index].pin);
       // Serial.println(v_buffer[i]);
       delay(100);
     }
-    pH_meterSettingList[ph_index].result = pH_meterSettingList[ph_index].a * afterFilterValue(v_buffer,NUM_READINGS)*3.3/4096 + pH_meterSettingList[ph_index].b;
+    double v;
+    switch (pH_meterSettingList[ph_index].adc_attenuatio)
+    {
+    case ADC_0db:
+      v = afterFilterValue(v_buffer,NUM_READINGS)*1.1/4096;
+      break;
+    case ADC_2_5db:
+      v = afterFilterValue(v_buffer,NUM_READINGS)*1.5/4096;
+      break;
+    case ADC_6db:
+      v = afterFilterValue(v_buffer,NUM_READINGS)*2.2/4096;
+      break;
+    default:
+      v = afterFilterValue(v_buffer,NUM_READINGS)*3.3/4096;
+      break;
+    }
+    pH_meterSettingList[ph_index].result = pH_meterSettingList[ph_index].a * v + pH_meterSettingList[ph_index].b;
     String DataTime = GetDatetimeString("-","T",":");
-    Serial.printf("%s, %s, %.2f, %.2f\n", 
+    Serial.printf("%s, %s, %.2f, %.3f\n", 
       pH_meterSettingList[ph_index].name.c_str(),
       DataTime.c_str(),
       pH_meterSettingList[ph_index].result,
-      afterFilterValue(v_buffer,NUM_READINGS)*3.3/4096
+      v
     );
     HTTPClient http1;
     String url1 = String(serverAddress) + String(endpoint) + 
