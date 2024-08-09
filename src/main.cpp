@@ -48,34 +48,40 @@ void setup() {
   connectToWiFi(); // 尝试连接到WiFi网络
   SPI.begin(); // 初始化 SPI 介面
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);  // 启动 WiFi 连接
-
-  pH_meterSettingList[0] = {33, "pH0001", 9.9852, 3.7507, ADC_6db};
-  pH_meterSettingList[1] = {34, "pH0002", 15.659, 9.5989, ADC_6db};
-  pH_meterSettingList[2] = {34, "pH0003", 5.2545, 1.4127, ADC_6db};
-  pH_meterSettingList[3] = {32, "pH0004", 3.5039, 3.8348, ADC_6db};
-  pH_meterSettingList[4] = {39, "pH0005", -42.568, 11.541, ADC_0db};
+  /**
+   * 0: 0dB --- 1.1 V
+   * 1: 2.5dB --- 1.5V
+   * 2: 6dB --- 2.2V
+   * 3: 11db --- 3.3V
+   */
+  pH_meterSettingList[0] = {33, "pH0001", 9.9852, 3.7507, 0, ADC_6db};
+  pH_meterSettingList[1] = {34, "pH0002", 15.659, 9.5989, 0, ADC_6db};
+  pH_meterSettingList[2] = {34, "pH0003", 5.2545, 1.4127, 0, ADC_6db};
+  pH_meterSettingList[3] = {32, "pH0004", 3.5039, 3.8348, 0, ADC_6db};
+  pH_meterSettingList[4] = {39, "pH0005", -42.568, 11.541, 0, ADC_0db};
   
-  while (!time(nullptr)) {
-    delay(100);
-    Serial.println("等待时间同步..."); // 等待时间同步完成
-  }
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo)) {
-    Serial.println("获取本地时间失败");
-    return;
-  }
-  Serial.printf("%d-%d-%d %d:%d:%d",
-    timeinfo.tm_year,timeinfo.tm_mon,timeinfo.tm_mday,
-    timeinfo.tm_hour,timeinfo.tm_min,timeinfo.tm_sec
-  );
-  setTime(timeinfo.tm_hour,timeinfo.tm_min,timeinfo.tm_sec,
-    timeinfo.tm_mday,timeinfo.tm_mon+1,timeinfo.tm_year+1900
-  );
+  // while (!time(nullptr)) {
+  //   delay(100);
+  //   Serial.println("等待时间同步..."); // 等待时间同步完成
+  // }
+  // struct tm timeinfo;
+  // if (!getLocalTime(&timeinfo)) {
+  //   Serial.println("获取本地时间失败");
+  //   return;
+  // }
+  // Serial.printf("%d-%d-%d %d:%d:%d",
+  //   timeinfo.tm_year,timeinfo.tm_mon,timeinfo.tm_mday,
+  //   timeinfo.tm_hour,timeinfo.tm_min,timeinfo.tm_sec
+  // );
+  // setTime(timeinfo.tm_hour,timeinfo.tm_min,timeinfo.tm_sec,
+  //   timeinfo.tm_mday,timeinfo.tm_mon+1,timeinfo.tm_year+1900
+  // );
 }
 
 void loop() {
-  for (int ph_index = 0; ph_index < 5; ph_index++) {
+  for (int ph_index = 0; ph_index < 1; ph_index++) {
     pinMode(pH_meterSettingList[ph_index].pin, INPUT);
+    // Serial.println(pH_meterSettingList[ph_index].adc_attenuatio);
     analogSetPinAttenuation(pH_meterSettingList[ph_index].pin, pH_meterSettingList[ph_index].adc_attenuatio);
     uint16_t v_buffer[NUM_READINGS];
     for(int i = 0; i < NUM_READINGS; i++){
